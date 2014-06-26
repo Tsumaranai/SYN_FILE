@@ -13,7 +13,7 @@ Author URI: http://tobias.baethge.com/
 add_filter( 'tablepress_table_output', 'tablepress_auto_url_conversion', 10, 3 );
 add_filter( 'tablepress_shortcode_table_default_shortcode_atts', 'tablepress_add_shortcode_parameter_auto_url_conversion' );
 
-/**
+/*
  * Add Extension's parameters as a valid parameters to the [table /] Shortcode
  */
 function tablepress_add_shortcode_parameter_auto_url_conversion( $default_atts ) {
@@ -25,6 +25,7 @@ function tablepress_add_shortcode_parameter_auto_url_conversion( $default_atts )
 	$default_atts['people_name'] = false;
 	$default_atts['project_name'] = false;
 	$default_atts['paper_title']=false;
+	$default_atts['people_info']=false;
 	return $default_atts;
 }
 
@@ -38,8 +39,13 @@ function tablepress_add_shortcode_parameter_auto_url_conversion( $default_atts )
  
 function tablepress_auto_url_conversion ( $output, $table, $render_options ) {
 	
+	/*
+	*you can change the url_address when the network enviorment changed
+	*meanwhile there's any staff adjustions, remember to modify the staff_group array;
+	*/
+	$url_address = "http://10.13.30.143/wordpress/";
 	
-	$url_address = "http://localhost/wordpress/";
+	
 	if ( $render_options['automatic_url_conversion'] ){
 		//print htmlentities( $output );
 		
@@ -59,6 +65,26 @@ function tablepress_auto_url_conversion ( $output, $table, $render_options ) {
 	/*
 	*The following is what I add~
 	*/	
+	$pos_name = $render_options['people_info'];
+	
+	if( !is_bool($pos_name) ){
+		/*如果不是false而是人员信息,就处理*/
+		
+			preg_match_all( '/<tr class="row-.+?>\n.+\n<\/tr>/', $output, $match);
+			
+			//var_dump($match);
+			
+			foreach($match[0] as $k => $v){
+				
+				if( $k == 0 )
+					continue;		/*第一个是标题不用匹配*/
+				if(strpos($v, $pos_name) === false){
+				
+					$output = str_replace( $v, '', $output);
+				}
+			}
+		
+	}
 	
 	$p_name = $render_options['people_name'];
 	
@@ -126,7 +152,7 @@ function tablepress_auto_url_conversion ( $output, $table, $render_options ) {
 			
 			$output .= '发表会议期刊：'.$tmp[0].'<br/>';
 			
-			preg_match( '/<td class="column-5">.+?<\/td>/', $match[0], $tmp);
+			preg_match( '/<td class="column-5">.*?<\/td>/', $match[0], $tmp);
 			
 			$output .= '下载链接：'.$tmp[0].'<br/>';
 			
@@ -145,7 +171,7 @@ function tablepress_auto_url_conversion ( $output, $table, $render_options ) {
 		
 			//print htmlentities($v);
 			//echo "</br>";
-			$output = str_replace( $v, '<a href="./'.$v.'">'.$v.'</a>' , $output);
+				$output = str_replace( $v, '<a href="'.$url_address.$v.'">'.$v.'</a>' , $output);
 			
 		}
 	}	
@@ -160,7 +186,7 @@ function tablepress_auto_url_conversion ( $output, $table, $render_options ) {
 		//var_dump($match_title);
 		foreach( $match_title[0] as $k => $v){
 		
-			$output = str_replace( $v, '<a href="'.$url_address.'科研成果/学术论文/'.$v.'">'.$v.'</a>', $output);
+			$output = str_replace( $v, '<a href="'.$url_address.$v.'">'.$v.'</a>', $output);
 		}
 		
 		//'<a href="../../科研成果/学术论文/'.$vn.'">'.$vn.'</a>'
@@ -168,13 +194,30 @@ function tablepress_auto_url_conversion ( $output, $table, $render_options ) {
 		preg_match_all( '/(?<=<td class="column-2">).+?(?=<\/td>)/', $output, $match);
 		//生成人员超链接
 		//var_dump($match);
+		$table_info = TablePress::$controller->model_table->load( 1 );
+	/*
+	*
+	*this function is so improtant, I should search the thread earlier!!
+	*1 means table_id people infomation was stored in table 1
+	*/
+		//var_dump( $table_info );
+		
+		foreach( $table_info['data'] as $k => $v){
+			
+			if( $k == 0)
+				continue;//first is title
+			$staff_group[($k - 1)] = $v[0];
+			//$v[0] array 0 is stored by name
+		}
+		
 		foreach( $match[0] as $k => $v){
 		
 			$name = split('[;.\ ,]',$v);
 			//var_dump($name);
 			foreach($name as $kn => $vn){
 				
-				$output = preg_replace( '/'.$vn.'(?=[;.\ ,])'.'|'.$vn.'(?=<\/td>)'.'/', '<a href="'.$url_address.'人员简介/学生/'.$vn.'">'.$vn.'</a>', $output);
+				if(in_array( $vn, $staff_group))
+					$output = preg_replace( '/'.$vn.'(?=[;.\ ,])'.'|'.$vn.'(?=<\/td>)'.'/', '<a href="'.$url_address.$vn.'">'.$vn.'</a>', $output);
 				/*匹配姓名后面是";"或者是后面是"<\td>"的姓名。这样匹配不会造成混乱。*/
 			}
 		}
@@ -210,7 +253,6 @@ function tablepress_auto_url_conversion ( $output, $table, $render_options ) {
 	
 		
 	}//end of paper_hyperlink
-	
 	
 	
 	return $output;
